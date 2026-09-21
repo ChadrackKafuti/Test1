@@ -5,7 +5,8 @@ A mobile-first, single-page planner for the CAFI delegation at Climate Week and 
 ## Features
 
 - **Agenda** – day tabs for Monday 21 to Friday 25 September, with every session, meeting, lunch, reception and logistics item from the logistics note. Each card shows time, duration, venue, address, Google Maps link, organiser contact and the CAFI participants.
-- **Filters** – filter by CAFI participant or by event type, and full-text search across the whole week. When a participant is selected, overlapping events are flagged.
+- **Filters** – filter by CAFI participant or by event type, view one day or the whole week, and full-text search across the programme.
+- **Travel timeline** – with a participant selected (or in My plan), consecutive events are joined by travel connectors: New York area to area, suggested transport, estimated minutes, a leave-by time and the remaining buffer, colour-coded as comfortable, tight, leave early or overlap. Stat tiles count the transitions and conflicts, and each card can show travel from every earlier event that day. Times are estimates; always verify on Google Maps.
 - **My plan** – star events to build a personal schedule, saved in the browser. Export it as an `.ics` calendar file or print it.
 - **Info** – ground pass, MPTFO office, agenda folder, electricity, communication, weather, emergency numbers and JFK airport.
 - **Contacts** – tap-to-call and WhatsApp links for the logistics contacts, plus a per-person event count for the delegation.
@@ -25,7 +26,8 @@ Then open <http://localhost:8000>. The site can be deployed as-is to any static 
 
 All content lives in `js/data.js`:
 
-- `sessions` – one object per event (`date`, `start`, `end`, `title`, `type`, `venue`, `address`, `map`, `contact`, `participants`). Use `"all"` for the whole delegation, or a list of participant ids. Set `tbc: true` when the venue is not yet confirmed.
+- `sessions` – one object per event (`date`, `start`, `end`, `title`, `type`, `area`, `venue`, `address`, `map`, `contact`, `participants`).
+- `areas` and `travel` – the New York areas and the door-to-door minutes and transport mode between each pair. Use `"all"` for the whole delegation, or a list of participant ids. Set `tbc: true` when the venue is not yet confirmed.
 - `participants`, `info` and `contacts` – the delegation, the practical information cards and the contact list.
 
 ## Structure

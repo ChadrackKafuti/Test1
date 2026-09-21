@@ -25,6 +25,59 @@ window.PLANNER_DATA = {
     { date: "2026-09-25", label: "Fri", num: "25" },
   ],
 
+  /* New York areas used for travel estimates between consecutive events. */
+  areas: {
+    un: { label: "Midtown East / UN" },
+    sutton: { label: "Sutton Place / East 50s" },
+    midtown: { label: "Midtown / Central Park South" },
+    nomad: { label: "NoMad" },
+    hk: { label: "Hell's Kitchen" },
+    ues: { label: "Upper East Side" },
+    chelsea: { label: "Chelsea / Hudson Yards" },
+    bronx: { label: "Bronx Zoo" },
+    tbc: { label: "Venue to be confirmed", unknown: true },
+  },
+
+  /* Door-to-door estimates in minutes, symmetric. Always verify on Google Maps. */
+  travel: [
+    ["un", "un", 12, "Walk between venues"],
+    ["un", "sutton", 15, "Walk up 1st Avenue, or taxi"],
+    ["un", "midtown", 15, "Walk across Midtown, or taxi"],
+    ["un", "nomad", 20, "Taxi, or 6 train from Grand Central to 28 St"],
+    ["un", "hk", 25, "Crosstown taxi, or walk along 45th St"],
+    ["un", "ues", 25, "Taxi, or 6 train from Grand Central to 68 St"],
+    ["un", "chelsea", 30, "Taxi, or 7 train from Grand Central to 34 St–Hudson Yards"],
+    ["un", "bronx", 60, "Taxi (45–60 min), or 2/5 train to West Farms Sq"],
+    ["sutton", "sutton", 8, "Walk between venues"],
+    ["sutton", "midtown", 15, "Walk or taxi"],
+    ["sutton", "nomad", 25, "Taxi, or 6 train from 51 St to 28 St"],
+    ["sutton", "hk", 30, "Crosstown taxi"],
+    ["sutton", "ues", 20, "Taxi, or 6 train from 51 St to 68 St"],
+    ["sutton", "chelsea", 35, "Taxi, or E train from Lexington Av/53 St to Penn Station"],
+    ["sutton", "bronx", 60, "Taxi (45–60 min)"],
+    ["midtown", "midtown", 10, "Walk between venues"],
+    ["midtown", "nomad", 20, "Taxi, or N/R train from 5 Av–59 St to 28 St"],
+    ["midtown", "hk", 20, "Walk or taxi"],
+    ["midtown", "ues", 15, "Taxi, or 6 train from 59 St to 68 St"],
+    ["midtown", "chelsea", 25, "Taxi, or 1 train from 59 St–Columbus Circle to 28 St"],
+    ["midtown", "bronx", 60, "Taxi (45–60 min)"],
+    ["nomad", "nomad", 8, "Walk between venues"],
+    ["nomad", "hk", 25, "Taxi, or 1 train from 28 St to 50 St"],
+    ["nomad", "ues", 30, "Taxi, or 6 train from 28 St to 68 St"],
+    ["nomad", "chelsea", 15, "Walk, or taxi"],
+    ["nomad", "bronx", 65, "Taxi (50–65 min)"],
+    ["hk", "hk", 8, "Walk between venues"],
+    ["hk", "ues", 30, "Taxi across Central Park"],
+    ["hk", "chelsea", 20, "Walk or taxi down 9th Avenue"],
+    ["hk", "bronx", 65, "Taxi (50–65 min)"],
+    ["ues", "ues", 8, "Walk between venues"],
+    ["ues", "chelsea", 40, "Taxi, or 6 train to Grand Central then 7 to Hudson Yards"],
+    ["ues", "bronx", 50, "Taxi (40–50 min), or 6 train to Pelham Pkwy"],
+    ["chelsea", "chelsea", 8, "Walk between venues"],
+    ["chelsea", "bronx", 70, "Taxi (55–70 min)"],
+    ["bronx", "bronx", 8, "Walk within Bronx Zoo"],
+  ],
+
   types: {
     session: { label: "Session / panel" },
     meeting: { label: "Meeting" },
@@ -38,6 +91,7 @@ window.PLANNER_DATA = {
     /* ---------- Monday 21 September ---------- */
     {
       id: "d1-ground-pass",
+      area: "un",
       date: "2026-09-21",
       start: "09:00",
       end: null,
@@ -52,6 +106,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d1-redd-roundtable",
+      area: "nomad",
       date: "2026-09-21",
       start: "09:00",
       end: "11:00",
@@ -66,6 +121,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d1-mptfo-exec",
+      area: "un",
       date: "2026-09-21",
       start: "12:00",
       end: "12:30",
@@ -78,6 +134,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d1-mptfo-lunch",
+      area: "un",
       date: "2026-09-21",
       start: "12:30",
       end: "14:00",
@@ -90,6 +147,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d1-bilat-gabon",
+      area: "tbc",
       date: "2026-09-21",
       start: "14:00",
       end: "15:00",
@@ -101,6 +159,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d1-gabon-norway",
+      area: "un",
       date: "2026-09-21",
       start: "15:30",
       end: "16:30",
@@ -112,6 +171,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d1-jpmorgan",
+      area: "tbc",
       date: "2026-09-21",
       start: "17:00",
       end: "18:00",
@@ -123,6 +183,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d1-walton-cocktail",
+      area: "midtown",
       date: "2026-09-21",
       start: "18:00",
       end: "19:30",
@@ -136,6 +197,7 @@ window.PLANNER_DATA = {
     /* ---------- Tuesday 22 September ---------- */
     {
       id: "d2-fit-for-purpose",
+      area: "hk",
       date: "2026-09-22",
       start: "08:30",
       end: "11:00",
@@ -149,6 +211,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d2-science-panel",
+      area: "sutton",
       date: "2026-09-22",
       start: "10:00",
       end: "11:30",
@@ -162,6 +225,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d2-moore",
+      area: "ues",
       date: "2026-09-22",
       start: "10:00",
       end: null,
@@ -176,6 +240,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d2-nature-infra",
+      area: "sutton",
       date: "2026-09-22",
       start: "12:00",
       end: "13:30",
@@ -188,6 +253,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d2-wcs-lunch",
+      area: "bronx",
       date: "2026-09-22",
       start: "13:00",
       end: "15:00",
@@ -200,6 +266,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d2-cross-regional",
+      area: "sutton",
       date: "2026-09-22",
       start: "15:00",
       end: "16:30",
@@ -213,6 +280,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d2-gabon-dinner",
+      area: "tbc",
       date: "2026-09-22",
       start: "17:30",
       end: "18:30",
@@ -227,6 +295,7 @@ window.PLANNER_DATA = {
     /* ---------- Wednesday 23 September ---------- */
     {
       id: "d3-nature-hub-plenaries",
+      area: "chelsea",
       date: "2026-09-23",
       start: "08:00",
       end: "11:35",
@@ -239,6 +308,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d3-gabon-infini",
+      area: "un",
       date: "2026-09-23",
       start: "11:00",
       end: "12:30",
@@ -252,6 +322,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d3-private-finance",
+      area: "chelsea",
       date: "2026-09-23",
       start: "12:15",
       end: "13:30",
@@ -264,6 +335,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d3-forces-of-nature",
+      area: "chelsea",
       date: "2026-09-23",
       start: "18:00",
       end: "20:00",
@@ -276,6 +348,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d3-rainforest-alliance",
+      area: "tbc",
       date: "2026-09-23",
       start: "18:00",
       end: "20:00",
@@ -287,6 +360,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d3-space-for-giants",
+      area: "tbc",
       date: "2026-09-23",
       start: "19:00",
       end: null,
@@ -301,6 +375,7 @@ window.PLANNER_DATA = {
     /* ---------- Thursday 24 September ---------- */
     {
       id: "d4-closing-the-gap",
+      area: "un",
       date: "2026-09-24",
       start: "08:30",
       end: "10:00",
@@ -313,6 +388,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d4-walton-meeting",
+      area: "midtown",
       date: "2026-09-24",
       start: "12:00",
       end: "14:00",
@@ -324,6 +400,7 @@ window.PLANNER_DATA = {
     },
     {
       id: "d4-gabon-reception",
+      area: "sutton",
       date: "2026-09-24",
       start: "18:00",
       end: "19:30",
@@ -337,6 +414,7 @@ window.PLANNER_DATA = {
     /* ---------- Friday 25 September ---------- */
     {
       id: "d5-direct-to-forest",
+      area: "midtown",
       date: "2026-09-25",
       start: "11:00",
       end: "13:00",

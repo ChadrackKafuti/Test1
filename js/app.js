@@ -16,7 +16,7 @@
 
   const state = {
     view: "agenda",
-    day: null,               // "YYYY-MM-DD"
+    day: null,               // "YYYY-MM-DD" or "all"
     who: load(LS_WHO, "all"),
     type: "all",
     q: "",
@@ -25,19 +25,25 @@
 
   const participantsById = Object.fromEntries(D.participants.map((p) => [p.id, p]));
   const sessionsById = Object.fromEntries(D.sessions.map((s) => [s.id, s]));
+  const TT = {};
+  for (const [a, b, mins, mode] of D.travel) { TT[a + "|" + b] = { mins, mode }; TT[b + "|" + a] = { mins, mode }; }
 
   /* ---------------- helpers ---------------- */
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const mins = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+  const hhmm = (total) => { const t = ((total % 1440) + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+  const DEFAULT_DURATION = 60; // assumed length for events that list only a start time
+  const endMins = (s) => (s.end ? mins(s.end) : mins(s.start) + DEFAULT_DURATION);
   const sessionParticipants = (s) => (s.participants === "all" ? D.participants.map((p) => p.id) : s.participants);
   const hasParticipant = (s, id) => id === "all" || sessionParticipants(s).includes(id);
+  const areaLabel = (id) => D.areas[id]?.label || id;
+  const byTime = (a, b) => a.date.localeCompare(b.date) || mins(a.start) - mins(b.start);
 
   function nyNow() {
-    // Returns {date:"YYYY-MM-DD", minutes} in New York time.
     try {
       const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: D.event.timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
       const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]));
-      return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) % 24 * 60 + Number(parts.minute) };
+      return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute) };
     } catch {
       const d = new Date();
       return { date: d.toISOString().slice(0, 10), minutes: d.getHours() * 60 + d.getMinutes() };
@@ -59,21 +65,80 @@
 
   function overlaps(a, b) {
     if (a.date !== b.date) return false;
-    const aS = mins(a.start), aE = a.end ? mins(a.end) : aS + 30;
-    const bS = mins(b.start), bE = b.end ? mins(b.end) : bS + 30;
-    return aS < bE && bS < aE;
+    return mins(a.start) < endMins(b) && mins(b.start) < endMins(a);
   }
 
   function status(s) {
     const now = nyNow();
     if (s.date !== now.date) return "";
-    const st = mins(s.start), en = s.end ? mins(s.end) : st + 30;
+    const st = mins(s.start), en = endMins(s);
     if (now.minutes >= st && now.minutes < en) return "live";
     if (now.minutes < st && st - now.minutes <= 60) return "soon";
-    if (now.minutes >= en) return "past";
     return "";
   }
 
+  /* ---------------- travel ---------------- */
+  function getTravel(a, b) {
+    if (D.areas[a]?.unknown || D.areas[b]?.unknown) return null;
+    return TT[a + "|" + b] || { mins: 30, mode: "Estimate – verify on Google Maps" };
+  }
+
+  // Describes the transition from event `from` to event `to` on the same day.
+  function sameVenue(a, b) {
+    if (a.tbc || b.tbc) return false;
+    const key = (s) => (s.address || s.venue || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    return key(a) && key(a) === key(b);
+  }
+
+  function transition(from, to) {
+    const gap = mins(to.start) - endMins(from);
+    const venue = sameVenue(from, to);
+    const t = venue ? { mins: 0, mode: "Same venue – no travel" } : getTravel(from.area, to.area);
+    if (!t) return { kind: "unknown", gap, label: "Venue to be confirmed", route: `${areaLabel(from.area)} → ${areaLabel(to.area)}` };
+    const buffer = gap - t.mins;
+    const leaveBy = hhmm(mins(to.start) - t.mins - 5);
+    const same = venue || from.area === to.area;
+    let kind;
+    if (gap < 0 || overlaps(from, to)) kind = "conflict";
+    else if (venue) kind = "ok";
+    else if (buffer < 0) kind = "early";
+    else if (buffer < 15) kind = "tight";
+    else kind = "ok";
+    return { kind, gap, buffer, leaveBy, same, mins: t.mins, mode: t.mode,
+      route: venue ? `${from.venue} · same venue` : same ? `${areaLabel(from.area)} · same area` : `${areaLabel(from.area)} → ${areaLabel(to.area)}` };
+  }
+
+  const KIND_LABEL = { ok: "Comfortable", tight: "Tight", early: "Leave early", conflict: "Overlap", unknown: "Check travel" };
+
+  function connectorHTML(from, to) {
+    const tr = transition(from, to);
+    const detail = tr.kind === "unknown"
+      ? `<span>Travel time unknown until the venue is confirmed</span>`
+      : tr.same
+        ? `<span>${esc(tr.mode)}</span><span>~${tr.mins} min</span><span>Gap: ${tr.gap} min</span>`
+        : `<span>${esc(tr.mode)}</span><span>~${tr.mins} min</span><span class="leave">Leave by <strong>${tr.leaveBy}</strong></span><span>Buffer: ${tr.buffer} min</span>`;
+    return `
+<div class="connector k-${tr.kind}" role="note">
+  <span class="k-dot" aria-hidden="true"></span>
+  <div class="c-body">
+    <div class="c-row1"><strong>${KIND_LABEL[tr.kind]}</strong><span class="route">${esc(tr.route)}</span></div>
+    <div class="c-row2">${detail}</div>
+  </div>
+</div>`;
+  }
+
+  function fromEarlierHTML(s, earlier) {
+    if (!earlier.length) return "";
+    const rows = earlier.map((prev) => {
+      const tr = transition(prev, s);
+      const leave = tr.kind === "unknown" ? "—" : tr.mins === 0 ? "Same venue" : tr.same ? "Walk within area" : `Leave by <strong>${tr.leaveBy}</strong>`;
+      const buf = tr.kind === "unknown" ? "Venue TBC" : tr.kind === "conflict" ? "Overlaps" : tr.buffer < 0 ? `${Math.abs(tr.buffer)} min short` : `${tr.buffer} min buffer`;
+      return `<tr class="k-${tr.kind}"><td>${esc(prev.title)}<div class="muted">${esc(prev.start)}–${esc(prev.end || "?")}</div></td><td>${tr.kind === "unknown" ? "—" : `~${tr.mins} min`}<div class="muted">${esc(tr.mode || "")}</div></td><td>${leave}<div class="muted">${buf}</div></td><td><span class="k-dot" aria-hidden="true"></span></td></tr>`;
+    }).join("");
+    return `<details class="from-earlier"><summary>Travel from earlier events today</summary><table><thead><tr><th>From</th><th>Travel</th><th>Leave by</th><th></th></tr></thead><tbody>${rows}</tbody></table></details>`;
+  }
+
+  /* ---------------- toast ---------------- */
   function toast(msg) {
     const t = $("#toast");
     t.textContent = msg;
@@ -88,7 +153,7 @@
     const [view, arg] = h.split("/");
     const views = ["agenda", "plan", "info", "contacts"];
     state.view = views.includes(view) ? view : "agenda";
-    if (state.view === "agenda" && arg && D.days.some((d) => d.date === arg)) state.day = arg;
+    if (state.view === "agenda" && arg && (arg === "all" || D.days.some((d) => d.date === arg))) state.day = arg;
   }
 
   function navigate(view, day) {
@@ -100,7 +165,7 @@
     const today = nyNow().date;
     const found = D.days.find((d) => d.date === today);
     if (found) return found.date;
-    if (today > D.days[D.days.length - 1].date) return D.days[D.days.length - 1].date;
+    if (today > D.days[D.days.length - 1].date) return "all";
     return D.days[0].date;
   }
 
@@ -133,7 +198,7 @@
     const dur = durationLabel(s);
 
     return `
-<article class="card ${starred ? "starred" : ""} ${st === "live" ? "live" : ""}" style="--c: var(--t-${esc(s.type)})" data-id="${esc(s.id)}">
+<article class="card ${starred ? "starred" : ""} ${st === "live" ? "live" : ""} ${conflicts.length ? "has-conflict" : ""}" style="--c: var(--t-${esc(s.type)})" data-id="${esc(s.id)}">
   <div class="time">
     <span class="start">${esc(s.start)}</span>
     ${timeEnd}
@@ -143,6 +208,7 @@
     <div class="meta-row">
       <span class="type-pill">${esc(type.label)}</span>
       ${s.tbc ? `<span class="pill-tbc">TBC</span>` : ""}
+      ${conflicts.length ? `<span class="pill-tbc">Overlap</span>` : ""}
       ${st === "live" ? `<span class="pill-live">Now</span>` : st === "soon" ? `<span class="pill-tbc" style="color:var(--brand);background:var(--brand-soft)">Soon</span>` : ""}
       ${opts.showDate ? `<span class="muted">${esc(longDate(s.date))}</span>` : ""}
     </div>
@@ -150,10 +216,12 @@
     ${s.subtitle ? `<p class="sub">${esc(s.subtitle)}</p>` : ""}
     <div class="${venueClass}">
       <svg class="ico"><use href="#i-pin"/></svg>
-      <div>${esc(s.venue || "Venue to be confirmed")}${s.address ? `<div class="addr">${esc(s.address)}</div>` : ""}</div>
+      <div>${esc(s.venue || "Venue to be confirmed")}${s.address ? `<div class="addr">${esc(s.address)}</div>` : ""}
+        ${!D.areas[s.area]?.unknown ? `<span class="area-pill">${esc(areaLabel(s.area))}</span>` : ""}</div>
     </div>
     ${s.notes ? `<div class="notes">${esc(s.notes)}</div>` : ""}
-    ${conflicts.length ? `<div class="conflict"><svg class="ico"><use href="#i-warn"/></svg>Overlaps with ${esc(conflicts.map((c) => c.title).join(", "))}</div>` : ""}
+    ${conflicts.length ? `<div class="conflict"><svg class="ico"><use href="#i-warn"/></svg>Overlaps with ${esc(conflicts.map((c) => c.title).join(" · "))}</div>` : ""}
+    ${opts.earlier ? fromEarlierHTML(s, opts.earlier) : ""}
     <div class="foot">
       ${whoBlock(s)}
       <div class="actions">
@@ -172,10 +240,56 @@
     return `<div class="empty"><svg class="ico"><use href="#${icon}"/></svg><strong>${esc(title)}</strong><span>${esc(text)}</span></div>`;
   }
 
+  // Renders a day's events as a timeline: cards joined by travel connectors when `travel` is on.
+  function timelineHTML(dayItems, opts) {
+    const out = [];
+    dayItems.forEach((s, i) => {
+      if (opts.travel && i > 0) out.push(connectorHTML(dayItems[i - 1], s));
+      const conflicts = opts.pool.filter((o) => o.id !== s.id && overlaps(s, o));
+      out.push(cardHTML(s, { conflicts, showDate: opts.showDate, earlier: opts.travel && i > 0 ? dayItems.slice(0, i) : null }));
+    });
+    return `<div class="cards ${opts.travel ? "timeline" : ""}">${out.join("")}</div>`;
+  }
+
+  function statsHTML(items, travel) {
+    let ok = 0, tight = 0, bad = 0, transitions = 0;
+    if (travel) {
+      for (const d of D.days) {
+        const day = items.filter((s) => s.date === d.date);
+        for (let i = 1; i < day.length; i++) {
+          const tr = transition(day[i - 1], day[i]);
+          transitions++;
+          if (tr.kind === "ok" || tr.kind === "unknown") ok++;
+          else if (tr.kind === "tight") tight++;
+          else bad++;
+        }
+      }
+    }
+    const tile = (n, label, cls = "") => `<div class="stat ${cls}"><b>${n}</b><span>${label}</span></div>`;
+    return `<div class="stats">
+      ${tile(items.length, "events")}
+      ${travel ? tile(transitions, "transitions") : ""}
+      ${travel ? tile(bad, "conflicts / leave early", "s-bad") : ""}
+      ${travel ? tile(tight, "tight transitions", "s-tight") : ""}
+      ${travel ? tile(ok, "comfortable", "s-ok") : ""}
+    </div>`;
+  }
+
+  const LEGEND = `<div class="legend"><strong>Legend</strong>
+    <span><i class="k-dot k-ok"></i>Comfortable</span>
+    <span><i class="k-dot k-tight"></i>Tight (&lt;15 min buffer)</span>
+    <span><i class="k-dot k-early"></i>Leave early</span>
+    <span><i class="k-dot k-conflict"></i>Time overlap</span>
+    <span><i class="k-dot k-unknown"></i>Venue TBC</span>
+    <em>Travel times are estimates – verify on Google Maps.</em></div>`;
+
   /* ---------------- rendering: agenda ---------------- */
   function renderDayStrip() {
     const today = nyNow().date;
-    $("#day-strip").innerHTML = D.days.map((d) => {
+    const total = D.sessions.filter((s) => hasParticipant(s, state.who)).length;
+    const week = `<button type="button" role="tab" class="day-btn week ${state.day === "all" ? "active" : ""}" data-day="all" aria-selected="${state.day === "all"}">
+        <span class="dow">Week</span><span class="num">21–25</span><span class="n">${total} events</span></button>`;
+    $("#day-strip").innerHTML = week + D.days.map((d) => {
       const n = D.sessions.filter((s) => s.date === d.date && hasParticipant(s, state.who)).length;
       return `<button type="button" role="tab" class="day-btn ${d.date === state.day ? "active" : ""} ${d.date === today ? "today" : ""}" data-day="${d.date}" aria-selected="${d.date === state.day}">
         <span class="dow">${d.label}</span><span class="num">${d.num}</span><span class="n">${n} event${n === 1 ? "" : "s"}</span>
@@ -200,16 +314,16 @@
   function filteredSessions() {
     const q = state.q.trim().toLowerCase();
     return D.sessions
-      .filter((s) => (q ? true : s.date === state.day))
+      .filter((s) => (q || state.day === "all" ? true : s.date === state.day))
       .filter((s) => hasParticipant(s, state.who))
       .filter((s) => state.type === "all" || s.type === state.type)
       .filter((s) => {
         if (!q) return true;
-        const hay = [s.title, s.subtitle, s.venue, s.address, s.notes, s.contact, D.types[s.type]?.label,
+        const hay = [s.title, s.subtitle, s.venue, s.address, s.notes, s.contact, D.types[s.type]?.label, areaLabel(s.area),
           ...sessionParticipants(s).map((id) => participantsById[id]?.name)].join(" ").toLowerCase();
         return hay.includes(q);
       })
-      .sort((a, b) => a.date.localeCompare(b.date) || mins(a.start) - mins(b.start));
+      .sort(byTime);
   }
 
   function renderAgenda() {
@@ -217,27 +331,35 @@
     renderChips();
     const list = filteredSessions();
     const q = state.q.trim();
-    $("#day-title").textContent = q ? `Results for “${q}”` : longDate(state.day);
+    const travel = state.who !== "all" && !q && state.type === "all";
+    const multiDay = q || state.day === "all";
+    $("#day-title").textContent = q ? `Results for “${q}”` : state.day === "all" ? "Whole week" : longDate(state.day);
     $("#result-count").textContent = `${list.length} event${list.length === 1 ? "" : "s"}`;
     $("#search-clear").hidden = !q;
 
+    const host = $("#agenda-list");
     if (!list.length) {
-      $("#agenda-list").innerHTML = emptyHTML("i-calendar", "Nothing here", q ? "Try a different search term." : "No events match these filters on this day.");
+      host.innerHTML = emptyHTML("i-calendar", "Nothing here", q ? "Try a different search term." : "No events match these filters on this day.");
       return;
     }
-    // conflict detection for the selected participant (or the viewer's plan)
-    $("#agenda-list").innerHTML = list.map((s) => {
-      let conflicts = [];
-      if (state.who !== "all") {
-        conflicts = D.sessions.filter((o) => o.id !== s.id && hasParticipant(o, state.who) && overlaps(s, o));
-      }
-      return cardHTML(s, { conflicts, showDate: !!q });
+    // Overlap pool: everything this participant attends (or everything, for "Everyone").
+    const pool = D.sessions.filter((s) => hasParticipant(s, state.who));
+    const hint = state.who === "all" && !q
+      ? `<div class="hint"><svg class="ico"><use href="#i-info"/></svg>Select a participant above to see their personal timeline with travel times, transport suggestions and departure alerts between events.</div>`
+      : "";
+    const head = travel ? statsHTML(list, true) + LEGEND : "";
+    const days = D.days.filter((d) => list.some((s) => s.date === d.date));
+    const body = days.map((d) => {
+      const dayItems = list.filter((s) => s.date === d.date);
+      const heading = multiDay ? `<h3 class="day-heading">${esc(longDate(d.date))} <span class="badge">${dayItems.length}</span></h3>` : "";
+      return `<section class="day-block">${heading}${timelineHTML(dayItems, { travel, pool, showDate: false })}</section>`;
     }).join("");
+    host.innerHTML = hint + head + body;
   }
 
   /* ---------------- rendering: plan ---------------- */
   function renderPlan() {
-    const items = D.sessions.filter((s) => state.plan.has(s.id)).sort((a, b) => a.date.localeCompare(b.date) || mins(a.start) - mins(b.start));
+    const items = D.sessions.filter((s) => state.plan.has(s.id)).sort(byTime);
     const host = $("#plan-list");
     $("#btn-ics").disabled = !items.length;
     $("#btn-clear-plan").disabled = !items.length;
@@ -245,12 +367,11 @@
       host.innerHTML = emptyHTML("i-star", "Your plan is empty", "Star events in the agenda to build your personal schedule.");
       return;
     }
-    host.innerHTML = D.days.map((d) => {
+    host.innerHTML = statsHTML(items, true) + LEGEND + D.days.map((d) => {
       const dayItems = items.filter((s) => s.date === d.date);
       if (!dayItems.length) return "";
-      return `<section class="plan-day"><h3>${esc(longDate(d.date))} <span class="muted">· ${dayItems.length}</span></h3><div class="cards">${
-        dayItems.map((s) => cardHTML(s, { conflicts: dayItems.filter((o) => o.id !== s.id && overlaps(s, o)) })).join("")
-      }</div></section>`;
+      return `<section class="day-block"><h3 class="day-heading">${esc(longDate(d.date))} <span class="badge">${dayItems.length}</span></h3>${
+        timelineHTML(dayItems, { travel: true, pool: items, showDate: false })}</section>`;
     }).join("");
   }
 
@@ -304,7 +425,8 @@
     else if (state.view === "plan") renderPlan();
     else if (state.view === "info") renderInfo();
     else if (state.view === "contacts") renderContacts();
-    document.title = state.view === "agenda" ? `${longDate(state.day)} · CAFI Climate Week Planner` : `${$(`#view-${state.view} h2`).textContent} · CAFI Climate Week Planner`;
+    const label = state.view === "agenda" ? (state.day === "all" ? "Whole week" : longDate(state.day)) : $(`#view-${state.view} h2`).textContent;
+    document.title = `${label} · CAFI Climate Week Planner`;
   }
 
   /* ---------------- .ics export ---------------- */
@@ -328,8 +450,7 @@
     for (const s of items) {
       const d = s.date.replace(/-/g, "");
       const st = s.start.replace(":", "") + "00";
-      const endMin = s.end ? mins(s.end) : mins(s.start) + 60;
-      const en = `${String(Math.floor(endMin / 60)).padStart(2, "0")}${String(endMin % 60).padStart(2, "0")}00`;
+      const en = hhmm(endMins(s)).replace(":", "") + "00";
       const loc = [s.venue, s.address].filter(Boolean).join(", ");
       const desc = [s.subtitle, s.notes, s.contact ? `Contact: ${s.contact}` : "", s.map ? `Map: ${s.map}` : "",
         `CAFI participants: ${s.participants === "all" ? "All staff" : sessionParticipants(s).map((id) => participantsById[id]?.name).join(", ") || (s.participantsNote || "TBC")}`].filter(Boolean).join("\n");
@@ -345,7 +466,7 @@
     return lines.join("\r\n") + "\r\n";
   }
   function downloadICS() {
-    const items = D.sessions.filter((s) => state.plan.has(s.id));
+    const items = D.sessions.filter((s) => state.plan.has(s.id)).sort(byTime);
     if (!items.length) return;
     const blob = new Blob([buildICS(items)], { type: "text/calendar;charset=utf-8" });
     const a = document.createElement("a");
@@ -358,8 +479,7 @@
 
   /* ---------------- events ---------------- */
   function toggleStar(id) {
-    const s = sessionsById[id];
-    if (!s) return;
+    if (!sessionsById[id]) return;
     if (state.plan.has(id)) { state.plan.delete(id); toast("Removed from my plan"); }
     else { state.plan.add(id); toast("Added to my plan"); }
     save(LS_PLAN, [...state.plan]);
@@ -380,7 +500,7 @@
     if (type) { state.type = type.dataset.type; render(); return; }
 
     const go = e.target.closest("[data-who-go]");
-    if (go) { state.who = go.dataset.whoGo; save(LS_WHO, state.who); state.q = ""; $("#search").value = ""; navigate("agenda"); window.scrollTo({ top: 0 }); return; }
+    if (go) { state.who = go.dataset.whoGo; save(LS_WHO, state.who); state.q = ""; $("#search").value = ""; state.day = "all"; navigate("agenda", "all"); window.scrollTo({ top: 0 }); return; }
   });
 
   $("#search").addEventListener("input", (e) => { state.q = e.target.value; renderAgenda(); });
