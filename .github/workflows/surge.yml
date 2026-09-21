@@ -1,0 +1,32 @@
+name: Deploy to Surge
+
+on:
+  push:
+    branches: [main, claude/beautiful-brown-px4jax]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: surge
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check token
+        run: |
+          if [ -z "$SURGE_TOKEN" ]; then
+            echo "::error::SURGE_TOKEN secret is not set. Run 'npx surge token' locally and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+      - name: Deploy
+        run: npx --yes surge ./ cafi-climate-week-2026.surge.sh --token "$SURGE_TOKEN"

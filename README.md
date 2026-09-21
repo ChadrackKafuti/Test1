@@ -41,4 +41,10 @@ manifest.webmanifest  web app manifest
 
 ## Deployment
 
-Every push to `main` (or the current feature branch) publishes the site to GitHub Pages through `.github/workflows/pages.yml`. The site is served at <https://chadrackkafuti.github.io/Test1/>.
+**Surge** – <https://cafi-climate-week-2026.surge.sh>. Every push to `main` (or the current feature branch) deploys through `.github/workflows/surge.yml`. It needs a `SURGE_TOKEN` repository secret: run `npx surge token` on your machine, then add the value under Settings > Secrets and variables > Actions. To deploy by hand instead:
+
+```
+npx surge ./ cafi-climate-week-2026.surge.sh
+```
+
+**GitHub Pages** – <https://chadrackkafuti.github.io/Test1/>, through `.github/workflows/pages.yml`, once Pages is enabled with "GitHub Actions" as the source in Settings > Pages.
