@@ -1,0 +1,14 @@
+{
+  "name": "CAFI Climate Week Planner",
+  "short_name": "CW Planner",
+  "description": "CAFI delegation planner for Climate Week and UNGA, New York, 21–25 September 2026.",
+  "start_url": "./index.html#/agenda",
+  "display": "standalone",
+  "background_color": "#f4f8f7",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
