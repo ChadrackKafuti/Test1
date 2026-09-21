@@ -17,16 +17,28 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+      SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
+      SURGE_PASSWORD: ${{ secrets.SURGE_PASSWORD }}
+      SURGE_DOMAIN: cafi-climate-week-2026.surge.sh
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Check token
+      - name: Resolve Surge token
         run: |
-          if [ -z "$SURGE_TOKEN" ]; then
-            echo "::error::SURGE_TOKEN secret is not set. Run 'npx surge token' locally and add it under Settings > Secrets and variables > Actions."
-            exit 1
+          if [ -n "$SURGE_TOKEN" ]; then
+            echo "Using SURGE_TOKEN secret."
+            exit 0
           fi
+          if [ -n "$SURGE_LOGIN" ] && [ -n "$SURGE_PASSWORD" ]; then
+            echo "Fetching a token with SURGE_LOGIN / SURGE_PASSWORD."
+            token=$(curl -sS -f -u "$SURGE_LOGIN:$SURGE_PASSWORD" -X POST https://surge.surge.sh/token | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).token))')
+            echo "::add-mask::$token"
+            echo "SURGE_TOKEN=$token" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "::error::No Surge credentials. Add a SURGE_TOKEN secret (from 'npx surge token'), or SURGE_LOGIN and SURGE_PASSWORD secrets, under Settings > Secrets and variables > Actions."
+          exit 1
       - name: Deploy
-        run: npx --yes surge ./ cafi-climate-week-2026.surge.sh --token "$SURGE_TOKEN"
+        run: npx --yes surge ./ "$SURGE_DOMAIN" --token "$SURGE_TOKEN"

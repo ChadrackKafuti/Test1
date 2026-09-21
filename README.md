@@ -41,7 +41,7 @@ manifest.webmanifest  web app manifest
 
 ## Deployment
 
-**Surge** – <https://cafi-climate-week-2026.surge.sh>. Every push to `main` (or the current feature branch) deploys through `.github/workflows/surge.yml`. It needs a `SURGE_TOKEN` repository secret: run `npx surge token` on your machine, then add the value under Settings > Secrets and variables > Actions. To deploy by hand instead:
+**Surge** – <https://cafi-climate-week-2026.surge.sh>. Every push to `main` (or the current feature branch) deploys through `.github/workflows/surge.yml`. It needs repository secrets under Settings > Secrets and variables > Actions: either `SURGE_TOKEN` (from `npx surge token` on your machine) or the `SURGE_LOGIN` and `SURGE_PASSWORD` of your Surge account. To deploy by hand instead:
 
 ```
 npx surge ./ cafi-climate-week-2026.surge.sh
