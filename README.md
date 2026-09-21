@@ -35,6 +35,6 @@ index.html            page shell and icon sprite
 css/styles.css        styles (light/dark, mobile/desktop, print)
 js/data.js            programme and logistics data
 js/app.js             rendering, filters, plan storage, .ics export
-assets/               CAFI logo, favicon and app icons
+assets/               CAFI logo and app icon (SVG)
 manifest.webmanifest  web app manifest
 ```
