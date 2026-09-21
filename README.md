@@ -38,3 +38,7 @@ js/app.js             rendering, filters, plan storage, .ics export
 assets/               CAFI logo and app icon (SVG)
 manifest.webmanifest  web app manifest
 ```
+
+## Deployment
+
+Every push to `main` (or the current feature branch) publishes the site to GitHub Pages through `.github/workflows/pages.yml`. The site is served at <https://chadrackkafuti.github.io/Test1/>.
